@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
+from app.api.conversation_routes import router as conversation_router
 from app.config import get_settings
 from loguru import logger
 import sys
@@ -34,6 +35,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(router)
+app.include_router(conversation_router)
 
 
 @app.get("/")
@@ -50,6 +52,13 @@ async def root():
 @app.on_event("startup")
 async def startup_event():
     """启动事件"""
+    from app.database import init_db
+    
+    # 初始化数据库
+    logger.info("Initializing database...")
+    init_db()
+    logger.info("Database initialized successfully")
+    
     settings = get_settings()
     logger.info("=" * 50)
     logger.info("RAG Knowledge Assistant API Starting...")

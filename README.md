@@ -26,28 +26,14 @@
 
 ## 快速开始
 
-### 方式1: 使用批处理脚本 (推荐)
-
-```bash
-setup.bat
-```
-
-### 方式2: 手动设置
-
-#### 1. 创建项目结构
-
-```bash
-python setup_project.py
-```
-
-#### 2. 创建虚拟环境
+#### 1. 创建虚拟环境
 
 ```bash
 cd backend
 python -m venv venv
 ```
 
-#### 3. 激活虚拟环境
+#### 2. 激活虚拟环境
 
 Windows:
 ```bash
@@ -59,13 +45,13 @@ Linux/Mac:
 source venv/bin/activate
 ```
 
-#### 4. 安装依赖
+#### 3. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-#### 5. 配置环境变量
+#### 4. 配置环境变量
 
 复制 `.env.example` 为 `.env` 并填入智谱 API Key:
 
@@ -78,7 +64,7 @@ copy .env.example .env
 ZHIPU_API_KEY=your_api_key_here
 ```
 
-#### 6. 启动后端服务
+#### 5. 启动后端服务
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

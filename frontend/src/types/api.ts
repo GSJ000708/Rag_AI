@@ -52,3 +52,57 @@ export interface HealthResponse {
   vectordb_status: string;
   documents_count: number;
 }
+
+// ============ 会话管理相关类型 ============
+
+export interface MessageResponse {
+  id: string;
+  conversation_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: SourceDocument[];
+  created_at: string;
+}
+
+export interface ConversationResponse {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message_preview?: string;
+}
+
+export interface ConversationDetailResponse {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: MessageResponse[];
+}
+
+export interface ConversationListResponse {
+  conversations: ConversationResponse[];
+  total: number;
+}
+
+export interface ConversationCreateRequest {
+  title?: string;
+}
+
+export interface ConversationUpdateRequest {
+  title: string;
+}
+
+export interface ConversationQueryRequest {
+  question: string;
+  top_k?: number;
+}
+
+export interface ConversationQueryResponse {
+  message_id: string;
+  conversation_id: string;
+  answer: string;
+  sources: SourceDocument[];
+  question: string;
+}

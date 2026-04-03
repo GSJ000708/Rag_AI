@@ -9,9 +9,9 @@ from loguru import logger
 class RAGService:
     """RAG (Retrieval-Augmented Generation) 服务"""
     
-    def __init__(self):
+    def __init__(self, vectordb_service: VectorDBService = None):
         self.llm = LLMService()
-        self.vectordb = VectorDBService()
+        self.vectordb = vectordb_service if vectordb_service else VectorDBService()
     
     def clean_answer(self, text: str) -> str:
         """
@@ -35,17 +35,30 @@ class RAGService:
         
         return text
     
-    def build_prompt(self, question: str, context_docs: List[Dict[str, Any]]) -> str:
+    def build_prompt(
+        self, 
+        question: str, 
+        context_docs: List[Dict[str, Any]],
+        conversation_history: List[Dict[str, str]] = None
+    ) -> str:
         """
-        构建 Prompt
+        构建 Prompt（支持对话历史）
         
         Args:
             question: 用户问题
             context_docs: 上下文文档列表
+            conversation_history: 对话历史 [{"role": "user/assistant", "content": "..."}]
             
         Returns:
             完整的 Prompt
         """
+        # 组装对话历史
+        history_text = ""
+        if conversation_history:
+            for msg in conversation_history[-10:]:  # 最近 10 条消息
+                role_name = "用户" if msg["role"] == "user" else "助手"
+                history_text += f"\n{role_name}: {msg['content']}\n"
+        
         # 组装上下文
         context_text = ""
         for i, doc in enumerate(context_docs, 1):
@@ -54,7 +67,28 @@ class RAGService:
             context_text += f"\n[文档{i}] {filename}\n{content}\n"
         
         # 构建 Prompt
-        prompt = f"""你是一个专业的知识库助手。请基于以下文档内容简洁准确地回答用户的问题。
+        if history_text:
+            prompt = f"""你是一个专业的知识库助手。请基于以下对话历史、文档内容简洁准确地回答用户的问题。
+
+对话历史:
+{history_text}
+
+参考文档:
+{context_text}
+
+当前问题: {question}
+
+回答要求:
+1. 结合对话历史理解问题（如果有代词，根据历史推断其指代）
+2. 严格根据文档内容回答，不要编造信息
+3. 如果文档中没有相关信息，请明确告知
+4. 回答要简洁、准确、有条理
+5. 避免过多空行，保持格式紧凑
+6. 可以使用简洁的列表或分点说明
+
+请直接给出答案:"""
+        else:
+            prompt = f"""你是一个专业的知识库助手。请基于以下文档内容简洁准确地回答用户的问题。
 
 参考文档:
 {context_text}
@@ -72,17 +106,19 @@ class RAGService:
         
         return prompt
     
-    def query(
+    async def query(
         self, 
         question: str, 
-        top_k: int = 3
+        top_k: int = 3,
+        conversation_history: List[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """
-        RAG 问答
+        RAG 问答（支持对话历史）
         
         Args:
             question: 用户问题
             top_k: 检索文档数量
+            conversation_history: 对话历史（可选）
             
         Returns:
             包含答案和来源的字典
@@ -102,8 +138,8 @@ class RAGService:
                     'question': question
                 }
             
-            # 2. 构建 Prompt
-            prompt = self.build_prompt(question, retrieved_docs)
+            # 2. 构建 Prompt（带对话历史）
+            prompt = self.build_prompt(question, retrieved_docs, conversation_history)
             logger.debug(f"Prompt length: {len(prompt)} chars")
             
             # 3. LLM 生成答案

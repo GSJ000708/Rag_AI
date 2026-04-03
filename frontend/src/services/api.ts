@@ -8,7 +8,15 @@ import type {
   QueryResponse,
   DocumentListResponse,
   DeleteResponse,
-  HealthResponse
+  HealthResponse,
+  ConversationResponse,
+  ConversationListResponse,
+  ConversationDetailResponse,
+  ConversationCreateRequest,
+  ConversationUpdateRequest,
+  ConversationQueryRequest,
+  ConversationQueryResponse,
+  MessageResponse
 } from '../types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -70,6 +78,75 @@ export const api = {
    */
   health: async (): Promise<HealthResponse> => {
     const response = await apiClient.get<HealthResponse>('/api/health');
+    return response.data;
+  },
+
+  // ============ 会话管理相关接口 ============
+
+  /**
+   * 创建新会话
+   */
+  createConversation: async (data: ConversationCreateRequest = {}): Promise<ConversationResponse> => {
+    const response = await apiClient.post<ConversationResponse>('/api/conversations', data);
+    return response.data;
+  },
+
+  /**
+   * 获取会话列表
+   */
+  getConversations: async (skip: number = 0, limit: number = 100): Promise<ConversationListResponse> => {
+    const response = await apiClient.get<ConversationListResponse>('/api/conversations', {
+      params: { skip, limit }
+    });
+    return response.data;
+  },
+
+  /**
+   * 获取会话详情（含消息）
+   */
+  getConversation: async (conversationId: string): Promise<ConversationDetailResponse> => {
+    const response = await apiClient.get<ConversationDetailResponse>(`/api/conversations/${conversationId}`);
+    return response.data;
+  },
+
+  /**
+   * 更新会话标题
+   */
+  updateConversation: async (
+    conversationId: string,
+    data: ConversationUpdateRequest
+  ): Promise<ConversationResponse> => {
+    const response = await apiClient.put<ConversationResponse>(`/api/conversations/${conversationId}`, data);
+    return response.data;
+  },
+
+  /**
+   * 删除会话
+   */
+  deleteConversation: async (conversationId: string): Promise<DeleteResponse> => {
+    const response = await apiClient.delete<DeleteResponse>(`/api/conversations/${conversationId}`);
+    return response.data;
+  },
+
+  /**
+   * 获取会话消息列表
+   */
+  getMessages: async (conversationId: string): Promise<MessageResponse[]> => {
+    const response = await apiClient.get<MessageResponse[]>(`/api/conversations/${conversationId}/messages`);
+    return response.data;
+  },
+
+  /**
+   * 在会话中提问
+   */
+  queryInConversation: async (
+    conversationId: string,
+    request: ConversationQueryRequest
+  ): Promise<ConversationQueryResponse> => {
+    const response = await apiClient.post<ConversationQueryResponse>(
+      `/api/conversations/${conversationId}/query`,
+      request
+    );
     return response.data;
   },
 };
