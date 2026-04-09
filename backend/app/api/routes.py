@@ -7,11 +7,14 @@ from app.models.schemas import (
     QueryResponse,
     DocumentListResponse,
     DeleteResponse,
-    HealthResponse
+    HealthResponse,
+    ChatRequest,
+    ChatResponse,
 )
 from app.services.document import DocumentService
 from app.services.vectordb import VectorDBService
 from app.core.rag import RAGService
+from app.core.agent import AgentService
 from app.config import get_settings
 from loguru import logger
 import os
@@ -20,6 +23,29 @@ import shutil
 
 router = APIRouter(prefix="/api")
 settings = get_settings()
+
+# 单例懒加载
+_vectordb_service = None
+_rag_service = None
+_agent_service = None
+
+def get_vectordb() -> VectorDBService:
+    global _vectordb_service
+    if _vectordb_service is None:
+        _vectordb_service = VectorDBService()
+    return _vectordb_service
+
+def get_rag() -> RAGService:
+    global _rag_service
+    if _rag_service is None:
+        _rag_service = RAGService(get_vectordb())
+    return _rag_service
+
+def get_agent() -> AgentService:
+    global _agent_service
+    if _agent_service is None:
+        _agent_service = AgentService()
+    return _agent_service
 
 
 @router.post("/upload", response_model=DocumentUploadResponse)
@@ -92,8 +118,7 @@ async def query_knowledge(request: QueryRequest):
     基于 RAG 返回答案和来源文档
     """
     try:
-        rag_service = RAGService()
-        result = rag_service.query(
+        result = await get_rag().query(
             question=request.question,
             top_k=request.top_k or settings.top_k
         )
@@ -111,8 +136,7 @@ async def list_documents():
     获取所有文档列表
     """
     try:
-        vectordb = VectorDBService()
-        documents = vectordb.get_all_documents()
+        documents = get_vectordb().get_all_documents()
         
         return DocumentListResponse(
             documents=documents,
@@ -130,8 +154,7 @@ async def delete_document(document_id: str):
     删除指定文档
     """
     try:
-        vectordb = VectorDBService()
-        success = vectordb.delete_document(document_id)
+        success = get_vectordb().delete_document(document_id)
         
         if not success:
             raise HTTPException(status_code=404, detail="文档未找到")
@@ -154,8 +177,7 @@ async def health_check():
     健康检查
     """
     try:
-        vectordb = VectorDBService()
-        doc_count = vectordb.get_collection_count()
+        doc_count = get_vectordb().get_collection_count()
         
         return HealthResponse(
             status="healthy",
@@ -172,3 +194,19 @@ async def health_check():
             vectordb_status="error",
             documents_count=0
         )
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def free_chat(request: ChatRequest):
+    """
+    纯闲聊，不查知识库
+    """
+    try:
+        answer = await get_agent().chat(
+            message=request.message,
+            conversation_history=request.history or None
+        )
+        return ChatResponse(answer=answer, message=request.message)
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

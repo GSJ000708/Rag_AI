@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # 模型配置
     llm_model: str = "glm-4-air"
     embedding_model: str = "embedding-3"
+
+    # 搜索工具配置（博查 API，可选）
+    bocha_api_key: str = ""
     
     # 日志配置
     log_level: str = "INFO"

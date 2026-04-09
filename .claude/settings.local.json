@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda run:*)",
+      "Bash(D:/anaconda3/envs/agent_rag/python.exe -c \"from duckduckgo_search import DDGS; r=list\\(DDGS\\(\\).text\\('厦门旅游景点',max_results=2\\)\\); print\\('OK',len\\(r\\)\\); print\\(r[0] if r else 'empty'\\)\")",
+      "Read(//d/anaconda3/envs//**)",
+      "Read(//c/Users/Administrator/.conda/envs//**)",
+      "Bash(/c/Users/Administrator/.conda/envs/agent_rag/python.exe -c \"from duckduckgo_search import DDGS; r=list\\(DDGS\\(\\).text\\('Xiamen tourism',max_results=2\\)\\); print\\('OK',len\\(r\\)\\); print\\(r[0]['title'] if r else 'empty'\\)\")",
+      "Bash(/c/Users/Administrator/.conda/envs/agent_rag/python.exe -m pip install \"duckduckgo-search==3.9.6\" -q)",
+      "Bash(/c/Users/Administrator/.conda/envs/agent_rag/python.exe -m pip install \"duckduckgo-search==2.9.4\" -q)",
+      "Bash(/c/Users/Administrator/.conda/envs/agent_rag/python.exe -c \"from duckduckgo_search import ddg; r=ddg\\('Xiamen tourism',max_results=2\\); print\\('OK',len\\(r\\) if r else 0\\); print\\(r[0] if r else 'empty'\\)\")"
+    ]
+  }
+}

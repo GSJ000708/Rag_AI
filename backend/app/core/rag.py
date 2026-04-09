@@ -1,173 +1,81 @@
-"""RAG 核心逻辑"""
-from typing import List, Dict, Any
+"""RAG 核心逻辑 —— 纯检索增强生成，不包含工具调用"""
 import re
+from typing import List, Dict, Any
 from app.core.llm import LLMService
 from app.services.vectordb import VectorDBService
 from loguru import logger
 
+SYSTEM_PROMPT = (
+    "你是一个专业的知识库助手。请严格根据提供的参考文档回答用户问题，"
+    "不要编造信息。如果文档中没有相关内容，请明确告知。"
+    "回答要简洁、准确、有条理。"
+)
+
 
 class RAGService:
-    """RAG (Retrieval-Augmented Generation) 服务"""
-    
+    """RAG 服务：检索 → 增强 Prompt → 生成答案"""
+
     def __init__(self, vectordb_service: VectorDBService = None):
         self.llm = LLMService()
         self.vectordb = vectordb_service if vectordb_service else VectorDBService()
-    
-    def clean_answer(self, text: str) -> str:
-        """
-        清理 AI 回答，去掉多余空行
-        
-        Args:
-            text: 原始文本
-            
-        Returns:
-            清理后的文本
-        """
-        # 替换多个连续空行为单个空行
-        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
-        
-        # 去掉开头和结尾的空白
-        text = text.strip()
-        
-        # 去掉每行末尾的空格
-        lines = [line.rstrip() for line in text.split('\n')]
-        text = '\n'.join(lines)
-        
-        return text
-    
-    def build_prompt(
-        self, 
-        question: str, 
-        context_docs: List[Dict[str, Any]],
-        conversation_history: List[Dict[str, str]] = None
-    ) -> str:
-        """
-        构建 Prompt（支持对话历史）
-        
-        Args:
-            question: 用户问题
-            context_docs: 上下文文档列表
-            conversation_history: 对话历史 [{"role": "user/assistant", "content": "..."}]
-            
-        Returns:
-            完整的 Prompt
-        """
-        # 组装对话历史
-        history_text = ""
-        if conversation_history:
-            for msg in conversation_history[-10:]:  # 最近 10 条消息
-                role_name = "用户" if msg["role"] == "user" else "助手"
-                history_text += f"\n{role_name}: {msg['content']}\n"
-        
-        # 组装上下文
-        context_text = ""
-        for i, doc in enumerate(context_docs, 1):
-            content = doc['content']
-            filename = doc['metadata'].get('filename', 'unknown')
-            context_text += f"\n[文档{i}] {filename}\n{content}\n"
-        
-        # 构建 Prompt
-        if history_text:
-            prompt = f"""你是一个专业的知识库助手。请基于以下对话历史、文档内容简洁准确地回答用户的问题。
 
-对话历史:
-{history_text}
-
-参考文档:
-{context_text}
-
-当前问题: {question}
-
-回答要求:
-1. 结合对话历史理解问题（如果有代词，根据历史推断其指代）
-2. 严格根据文档内容回答，不要编造信息
-3. 如果文档中没有相关信息，请明确告知
-4. 回答要简洁、准确、有条理
-5. 避免过多空行，保持格式紧凑
-6. 可以使用简洁的列表或分点说明
-
-请直接给出答案:"""
-        else:
-            prompt = f"""你是一个专业的知识库助手。请基于以下文档内容简洁准确地回答用户的问题。
-
-参考文档:
-{context_text}
-
-用户问题: {question}
-
-回答要求:
-1. 严格根据文档内容回答，不要编造信息
-2. 如果文档中没有相关信息，请明确告知
-3. 回答要简洁、准确、有条理
-4. 避免过多空行，保持格式紧凑
-5. 可以使用简洁的列表或分点说明
-
-请直接给出答案:"""
-        
-        return prompt
-    
     async def query(
-        self, 
-        question: str, 
+        self,
+        question: str,
         top_k: int = 3,
         conversation_history: List[Dict[str, str]] = None
     ) -> Dict[str, Any]:
-        """
-        RAG 问答（支持对话历史）
-        
-        Args:
-            question: 用户问题
-            top_k: 检索文档数量
-            conversation_history: 对话历史（可选）
-            
-        Returns:
-            包含答案和来源的字典
-        """
+        """混合检索 → 拼 Prompt → LLM 生成答案"""
         try:
-            # 1. 向量检索相关文档
-            logger.info(f"Searching for question: {question}")
-            retrieved_docs = self.vectordb.search(
-                query=question,
-                top_k=top_k
-            )
-            
-            if not retrieved_docs:
+            # 1. 混合检索（向量 + BM25 + RRF）
+            logger.info(f"RAG search: {question!r}")
+            docs = self.vectordb.search(query=question, top_k=top_k)
+
+            if not docs:
                 return {
-                    'answer': '抱歉，我在知识库中没有找到相关信息来回答您的问题。',
-                    'sources': [],
-                    'question': question
+                    "answer": "抱歉，知识库中没有找到相关信息。",
+                    "sources": [],
+                    "question": question,
+                    "mode": "rag"
                 }
-            
-            # 2. 构建 Prompt（带对话历史）
-            prompt = self.build_prompt(question, retrieved_docs, conversation_history)
-            logger.debug(f"Prompt length: {len(prompt)} chars")
-            
-            # 3. LLM 生成答案
-            logger.info("Generating answer with LLM")
-            raw_answer = self.llm.generate(prompt)
-            
-            # 清理答案格式
-            answer = self.clean_answer(raw_answer)
-            
-            # 4. 格式化来源文档
-            sources = []
-            for doc in retrieved_docs:
-                sources.append({
-                    'content': doc['content'][:200] + '...' if len(doc['content']) > 200 else doc['content'],
-                    'filename': doc['metadata'].get('filename', 'unknown'),
-                    'page': doc['metadata'].get('chunk_index'),
-                    'score': round(doc['score'], 4)
-                })
-            
-            result = {
-                'answer': answer,
-                'sources': sources,
-                'question': question
-            }
-            
-            logger.info("RAG query completed successfully")
-            return result
-            
+
+            # 2. 构建消息（system 带检索内容 + 历史 + 当前问题）
+            context = "\n".join(
+                f"[文档{i}] {d['metadata'].get('filename', 'unknown')}\n{d['content']}"
+                for i, d in enumerate(docs, 1)
+            )
+            messages = [{"role": "system", "content": f"{SYSTEM_PROMPT}\n\n参考文档：\n{context}"}]
+            for msg in (conversation_history or [])[-10:]:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+            messages.append({"role": "user", "content": question})
+
+            # 3. 生成答案
+            logger.info("Generating RAG answer")
+            raw = self.llm.generate_with_messages(messages)
+            answer = _clean(raw)
+
+            # 4. 格式化来源
+            sources = [
+                {
+                    "content": d["content"][:200] + ("..." if len(d["content"]) > 200 else ""),
+                    "filename": d["metadata"].get("filename", "unknown"),
+                    "page": d["metadata"].get("chunk_index"),
+                    "score": round(d["score"], 4)
+                }
+                for d in docs
+            ]
+
+            logger.info("RAG query completed")
+            return {"answer": answer, "sources": sources, "question": question, "mode": "rag"}
+
         except Exception as e:
             logger.error(f"RAG query error: {e}")
             raise Exception(f"问答失败: {str(e)}")
+
+
+def _clean(text: str) -> str:
+    """去除多余空行和行尾空格"""
+    if not text:
+        return ""
+    text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text).strip()
+    return '\n'.join(line.rstrip() for line in text.split('\n'))

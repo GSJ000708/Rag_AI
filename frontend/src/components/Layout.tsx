@@ -6,6 +6,7 @@ import {
   UploadOutlined,
   FolderOutlined,
   RobotOutlined,
+  WechatOutlined,
 } from '@ant-design/icons';
 
 const { Header, Content, Footer } = AntLayout;
@@ -23,6 +24,11 @@ const Layout: FC<LayoutProps> = ({ children }) => {
       key: '/chat',
       icon: <MessageOutlined />,
       label: '智能问答',
+    },
+    {
+      key: '/freechat',
+      icon: <WechatOutlined />,
+      label: '自由闲聊',
     },
     {
       key: '/upload',

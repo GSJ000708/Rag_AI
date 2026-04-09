@@ -106,3 +106,15 @@ export interface ConversationQueryResponse {
   sources: SourceDocument[];
   question: string;
 }
+
+// ============ 闲聊相关类型 ============
+
+export interface ChatRequest {
+  message: string;
+  history?: { role: string; content: string }[];
+}
+
+export interface ChatResponse {
+  answer: string;
+  message: string;
+}

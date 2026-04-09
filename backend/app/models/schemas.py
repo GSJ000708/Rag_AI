@@ -63,6 +63,18 @@ class HealthResponse(BaseModel):
     documents_count: int
 
 
+class ChatRequest(BaseModel):
+    """闲聊请求"""
+    message: str = Field(..., min_length=1, description="用户消息")
+    history: list = Field(default_factory=list, description="对话历史")
+
+
+class ChatResponse(BaseModel):
+    """闲聊响应"""
+    answer: str
+    message: str
+
+
 # ============ 会话管理相关模型 ============
 
 class ConversationCreate(BaseModel):

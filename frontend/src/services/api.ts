@@ -16,7 +16,9 @@ import type {
   ConversationUpdateRequest,
   ConversationQueryRequest,
   ConversationQueryResponse,
-  MessageResponse
+  MessageResponse,
+  ChatRequest,
+  ChatResponse,
 } from '../types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -147,6 +149,14 @@ export const api = {
       `/api/conversations/${conversationId}/query`,
       request
     );
+    return response.data;
+  },
+
+  /**
+   * 纯闲聊（不查知识库）
+   */
+  chat: async (request: ChatRequest): Promise<ChatResponse> => {
+    const response = await apiClient.post<ChatResponse>('/api/chat', request);
     return response.data;
   },
 };

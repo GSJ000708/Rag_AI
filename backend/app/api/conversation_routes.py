@@ -22,9 +22,16 @@ from loguru import logger
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
-# 初始化服务
-vectordb_service = VectorDBService()
-rag_service = RAGService(vectordb_service)
+# 懒加载：避免启动时阻塞
+_vectordb_service = None
+_rag_service = None
+
+def get_rag_service() -> RAGService:
+    global _vectordb_service, _rag_service
+    if _rag_service is None:
+        _vectordb_service = VectorDBService()
+        _rag_service = RAGService(_vectordb_service)
+    return _rag_service
 
 
 @router.post("", response_model=ConversationResponse, status_code=201)
@@ -256,7 +263,7 @@ async def query_in_conversation(
             })
         
         # 执行 RAG 查询
-        result = await rag_service.query(
+        result = await get_rag_service().query(
             question=request.question,
             top_k=request.top_k,
             conversation_history=history_context  # 传入对话历史
